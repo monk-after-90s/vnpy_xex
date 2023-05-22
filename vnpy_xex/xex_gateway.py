@@ -33,7 +33,7 @@ from vnpy_rest import RestClient, Request
 CHINA_TZ = pytz.timezone("Asia/Shanghai")
 
 # 实盘REST API地址
-REST_HOST: str = "https://api.binance.com"  # todo
+REST_HOST: str = "http://49.234.137.37:8080/api/v3/"
 
 # 委托状态映射
 STATUS_BINANCE2VT: Dict[str, Status] = {
