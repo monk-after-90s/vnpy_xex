@@ -23,7 +23,6 @@ from vnpy.trader.object import (
     BarData,
     OrderRequest,
     CancelRequest,
-    SubscribeRequest,
     HistoryRequest
 )
 from vnpy.event import EventEngine
