@@ -35,10 +35,6 @@ CHINA_TZ = pytz.timezone("Asia/Shanghai")
 # 实盘REST API地址
 REST_HOST: str = "https://api.binance.com"  # todo
 
-# 实盘Websocket API地址
-WEBSOCKET_TRADE_HOST: str = "wss://stream.binance.com:9443/ws/"
-WEBSOCKET_DATA_HOST: str = "wss://stream.binance.com:9443/stream"
-
 # 委托状态映射
 STATUS_BINANCE2VT: Dict[str, Status] = {
     "NEW": Status.NOTTRADED,
@@ -337,17 +333,7 @@ class XEXRestAPi(RestClient):
         )
 
     def start_user_stream(self) -> Request:
-        """生成listenKey"""
-        data: dict = {
-            "security": Security.API_KEY
-        }
-
-        self.add_request(
-            method="POST",
-            path="/api/v3/userDataStream",
-            callback=self.on_start_user_stream,
-            data=data
-        )
+        ...
 
     def on_query_time(self, data: dict, request: Request) -> None:
         """时间查询回报"""
@@ -465,18 +451,6 @@ class XEXRestAPi(RestClient):
 
         msg = f"撤单失败，状态码：{status_code}，信息：{request.response.text}"
         self.gateway.write_log(msg)
-
-    def on_start_user_stream(self, data: dict, request: Request) -> None:
-        """生成listenKey回报"""
-        self.user_stream_key = data["listenKey"]
-        self.keep_alive_count = 0
-
-        if self.server == "REAL":
-            url = WEBSOCKET_TRADE_HOST + self.user_stream_key
-        else:
-            raise NotImplementedError
-
-        self.trade_ws_api.connect(url, self.proxy_host, self.proxy_port)
 
     def on_keep_user_stream(self, data: dict, request: Request) -> None:
         """延长listenKey有效期回报"""
