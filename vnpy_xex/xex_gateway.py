@@ -225,7 +225,6 @@ class XEXRestAPi(RestClient):
 
         self.query_time()
         self.query_account()
-        # self.query_order()
         self.query_contract()
         # self.start_user_stream()
 
@@ -241,17 +240,6 @@ class XEXRestAPi(RestClient):
             method="GET",
             path="v1/u/wallet/list",
             callback=self.on_query_account,
-            data=data
-        )
-
-    def query_order(self) -> None:
-        """查询未成交委托"""
-        data: dict = {"security": Security.SIGNED}
-
-        self.add_request(
-            method="GET",
-            path="/api/v3/openOrders",
-            callback=self.on_query_order,
             data=data
         )
 
@@ -361,30 +349,6 @@ class XEXRestAPi(RestClient):
                     self.gateway.on_account(account)
 
             self.gateway.write_log("账户资金查询成功")
-
-    def on_query_order(self, data: dict, request: Request) -> None:
-        """未成交委托查询回报"""
-        for d in data:
-            # 过滤不支持类型的委托
-            if d["type"] not in ORDERTYPE_BINANCE2VT:
-                continue
-
-            order: OrderData = OrderData(
-                orderid=d["clientOrderId"],
-                symbol=d["symbol"].lower(),
-                exchange=Exchange.BINANCE,
-                price=float(d["price"]),
-                volume=float(d["origQty"]),
-                type=ORDERTYPE_BINANCE2VT[d["type"]],
-                direction=DIRECTION_BINANCE2VT[d["side"]],
-                traded=float(d["executedQty"]),
-                status=STATUS_BINANCE2VT.get(d["status"], None),
-                datetime=generate_datetime(d["time"]),
-                gateway_name=self.gateway_name,
-            )
-            self.gateway.on_order(order)
-
-        self.gateway.write_log("委托信息查询成功")
 
     def on_query_contract(self, data: dict, request: Request) -> None:
         """合约信息查询回报"""
