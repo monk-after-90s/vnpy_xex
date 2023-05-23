@@ -1,4 +1,8 @@
+import hashlib
+import hmac
+import json
 import time
+import urllib
 from copy import copy
 from datetime import datetime, timedelta
 from enum import Enum
@@ -23,7 +27,8 @@ from vnpy.trader.object import (
     BarData,
     OrderRequest,
     CancelRequest,
-    HistoryRequest
+    HistoryRequest,
+    SubscribeRequest
 )
 from vnpy.event import EventEngine
 from vnpy_rest import RestClient, Request
@@ -32,7 +37,7 @@ from vnpy_rest import RestClient, Request
 CHINA_TZ = pytz.timezone("Asia/Shanghai")
 
 # 实盘REST API地址
-REST_HOST: str = "http://49.234.137.37:8080/api/v3/"
+BASE_URL: str = "http://openapi.hipiex.net/spot/"
 
 # 委托状态映射
 STATUS_BINANCE2VT: Dict[str, Status] = {
@@ -80,7 +85,6 @@ symbol_contract_map: Dict[str, ContractData] = {}
 class Security(Enum):
     NONE = 0
     SIGNED = 1
-    API_KEY = 2
 
 
 class XEXGateway(BaseGateway):
@@ -128,6 +132,10 @@ class XEXGateway(BaseGateway):
         """查询资金"""
         pass
 
+    def subscribe(self, req: SubscribeRequest) -> None:
+        """订阅行情"""
+        pass
+
     def query_position(self) -> None:
         """查询持仓"""
         pass
@@ -161,14 +169,13 @@ class XEXRestAPi(RestClient):
         self.gateway_name: str = gateway.gateway_name
 
         self.key: str = ""
-        self.secret: str = ""
+        self.secret: bytes = b""
         self.proxy_host = ""
         self.proxy_port = ""
 
         self.user_stream_key: str = ""
         self.keep_alive_count: int = 0
         self.recv_window: int = 5000
-        self.time_offset: int = 0
 
         self.order_count: int = 1_000_000
         self.order_count_lock: Lock = Lock()
@@ -176,7 +183,31 @@ class XEXRestAPi(RestClient):
 
     def sign(self, request: Request) -> Request:
         """生成XEX签名"""
+        security: Security = request.data["security"]
+        request.data.pop("security")
 
+        if security == Security.SIGNED:
+            if request.params is None: request.params = {}
+            request.params['timestamp'] = int(time.time() * 1000)
+            request.params['recvWindow'] = 5000
+            # 计算签名
+            query = str_to_sign = urllib.parse.urlencode(sorted(request.params.items()))
+            if request.data:
+                str_to_sign += json.dumps(request.data)
+            signature = \
+                hmac.new(self.secret, str_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+            query += f"&signature={signature}"
+            # query取代params
+            request.path += "?" + query
+            request.params = {}
+            # 添加请求头
+            if request.headers is None: request.headers = {}
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+                "X-MBX-APIKEY": self.key,
+            }
+            request.headers.update(headers)
         return request
 
     def connect(
@@ -196,7 +227,7 @@ class XEXRestAPi(RestClient):
                 int(datetime.now(CHINA_TZ).strftime("%y%m%d%H%M%S")) * self.order_count
         )
 
-        self.init(REST_HOST, proxy_host, proxy_port)
+        self.init(BASE_URL, proxy_host, proxy_port)
 
         self.start()
 
@@ -204,23 +235,13 @@ class XEXRestAPi(RestClient):
 
         self.query_time()
         self.query_account()
-        self.query_order()
-        self.query_contract()
-        self.start_user_stream()
+        # self.query_order()
+        # self.query_contract()
+        # self.start_user_stream()
 
     def query_time(self) -> None:
         """查询时间"""
-        data: dict = {
-            "security": Security.NONE
-        }
-        path: str = "/api/v3/time"
-
-        self.add_request(
-            "GET",
-            path,
-            callback=self.on_query_time,
-            data=data
-        )
+        ...
 
     def query_account(self) -> None:
         """查询资金"""
@@ -332,13 +353,8 @@ class XEXRestAPi(RestClient):
         )
 
     def start_user_stream(self) -> Request:
+        """用户数据推送"""
         ...
-
-    def on_query_time(self, data: dict, request: Request) -> None:
-        """时间查询回报"""
-        local_time = int(time.time() * 1000)
-        server_time = int(data["serverTime"])
-        self.time_offset = local_time - server_time
 
     def on_query_account(self, data: dict, request: Request) -> None:
         """资金查询回报"""
