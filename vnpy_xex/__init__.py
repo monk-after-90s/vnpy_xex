@@ -17,7 +17,7 @@ vnpy.trader.constant.Exchange = Exchange
 
 import importlib_metadata
 
-from .xex_gateway import XEXGateway
+from .xex_gateway import XEXSpotGateway
 
 try:
     __version__ = importlib_metadata.version("vnpy_xex")

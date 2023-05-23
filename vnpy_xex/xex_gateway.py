@@ -86,7 +86,7 @@ class Security(Enum):
     SIGNED = 1
 
 
-class XEXGateway(BaseGateway):
+class XEXSpotGateway(BaseGateway):
     """
     vn.py用于对接币XEX货账户的交易接口。
     """
@@ -106,7 +106,7 @@ class XEXGateway(BaseGateway):
         """构造函数"""
         super().__init__(event_engine, gateway_name)
 
-        self.rest_api: "XEXRestAPi" = XEXRestAPi(self)
+        self.rest_api: "XEXSpotRestAPi" = XEXSpotRestAPi(self)
 
         self.orders: Dict[str, OrderData] = {}
 
@@ -157,14 +157,14 @@ class XEXGateway(BaseGateway):
         return self.orders.get(orderid, None)
 
 
-class XEXRestAPi(RestClient):
+class XEXSpotRestAPi(RestClient):
     """币安现货REST API"""
 
-    def __init__(self, gateway: XEXGateway) -> None:
+    def __init__(self, gateway: XEXSpotGateway) -> None:
         """构造函数"""
         super().__init__()
 
-        self.gateway: XEXGateway = gateway
+        self.gateway: XEXSpotGateway = gateway
         self.gateway_name: str = gateway.gateway_name
 
         self.key: str = ""
