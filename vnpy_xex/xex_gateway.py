@@ -226,7 +226,7 @@ class XEXRestAPi(RestClient):
         self.query_time()
         self.query_account()
         # self.query_order()
-        # self.query_contract()
+        self.query_contract()
         # self.start_user_stream()
 
     def query_time(self) -> None:
@@ -262,7 +262,7 @@ class XEXRestAPi(RestClient):
         }
         self.add_request(
             method="GET",
-            path="/api/v3/exchangeInfo",
+            path="v1/exchangeInfo",
             callback=self.on_query_contract,
             data=data
         )
@@ -388,37 +388,33 @@ class XEXRestAPi(RestClient):
 
     def on_query_contract(self, data: dict, request: Request) -> None:
         """合约信息查询回报"""
-        for d in data["symbols"]:
-            base_currency: str = d["baseAsset"]
-            quote_currency: str = d["quoteAsset"]
-            name: str = f"{base_currency.upper()}/{quote_currency.upper()}"
+        if data.get('code') == 0:
+            for symbol in data['data']['pairs']:
+                if symbol['state'] == 1:
+                    base_currency: str = symbol['sellCoin']
+                    quote_currency: str = symbol['buyCoin']
+                    name: str = f"{base_currency.upper()}/{quote_currency.upper()}"
 
-            pricetick: int = 1
-            min_volume: int = 1
+                    pricetick = symbol['minStepPrice']
+                    min_volume = symbol['minQty']
 
-            for f in d["filters"]:
-                if f["filterType"] == "PRICE_FILTER":
-                    pricetick = float(f["tickSize"])
-                elif f["filterType"] == "LOT_SIZE":
-                    min_volume = float(f["stepSize"])
+                    contract: ContractData = ContractData(
+                        symbol=symbol["symbol"],
+                        exchange=Exchange.XEX,
+                        name=name,
+                        pricetick=pricetick,
+                        size=1,
+                        min_volume=min_volume,
+                        product=Product.SPOT,
+                        history_data=True,
+                        gateway_name=self.gateway_name,
+                        stop_supported=True
+                    )
+                    self.gateway.on_contract(contract)
 
-            contract: ContractData = ContractData(
-                symbol=d["symbol"].lower(),
-                exchange=Exchange.BINANCE,
-                name=name,
-                pricetick=pricetick,
-                size=1,
-                min_volume=min_volume,
-                product=Product.SPOT,
-                history_data=True,
-                gateway_name=self.gateway_name,
-                stop_supported=True
-            )
-            self.gateway.on_contract(contract)
+                    symbol_contract_map[contract.symbol] = contract
 
-            symbol_contract_map[contract.symbol] = contract
-
-        self.gateway.write_log("合约信息查询成功")
+            self.gateway.write_log("合约信息查询成功")
 
     def on_send_order(self, data: dict, request: Request) -> None:
         """委托下单回报"""
