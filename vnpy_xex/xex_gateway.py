@@ -1,7 +1,5 @@
 import hashlib
 import hmac
-import json
-import time
 import urllib
 from copy import copy
 from datetime import datetime, timedelta
@@ -37,7 +35,8 @@ from vnpy_rest import RestClient, Request
 CHINA_TZ = pytz.timezone("Asia/Shanghai")
 
 # 实盘REST API地址
-BASE_URL: str = "http://openapi.hipiex.net/spot/"
+BASE_URL: str = "http://54.254.54.220:8069/"
+# BASE_URL: str = "http://openapi.hipiex.net/spot/"
 
 # 委托状态映射
 STATUS_BINANCE2VT: Dict[str, Status] = {
@@ -92,7 +91,7 @@ class XEXGateway(BaseGateway):
     vn.py用于对接币XEX货账户的交易接口。
     """
 
-    default_name: str = "XEX"
+    default_name: str = "XEX_SPOT"
 
     default_setting: Dict[str, Any] = {
         "key": "",
@@ -188,24 +187,15 @@ class XEXRestAPi(RestClient):
 
         if security == Security.SIGNED:
             if request.params is None: request.params = {}
-            request.params['timestamp'] = int(time.time() * 1000)
-            request.params['recvWindow'] = 5000
-            # 计算签名
-            query = str_to_sign = urllib.parse.urlencode(sorted(request.params.items()))
-            if request.data:
-                str_to_sign += json.dumps(request.data)
-            signature = \
-                hmac.new(self.secret, str_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
-            query += f"&signature={signature}"
-            # query取代params
-            request.path += "?" + query
-            request.params = {}
+            query = urllib.parse.urlencode(sorted(request.params.items()))
+            signature = hmac.new(self.secret, query.encode(), hashlib.sha256).hexdigest()
+
             # 添加请求头
             if request.headers is None: request.headers = {}
             headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json",
-                "X-MBX-APIKEY": self.key,
+                "x_access_key": self.key,
+                "x_signature": signature,
+                'Content-Type': 'application/json',
             }
             request.headers.update(headers)
         return request
@@ -249,7 +239,7 @@ class XEXRestAPi(RestClient):
 
         self.add_request(
             method="GET",
-            path="/api/v3/account",
+            path="v1/u/wallet/list",
             callback=self.on_query_account,
             data=data
         )
@@ -358,18 +348,19 @@ class XEXRestAPi(RestClient):
 
     def on_query_account(self, data: dict, request: Request) -> None:
         """资金查询回报"""
-        for account_data in data["balances"]:
-            account: AccountData = AccountData(
-                accountid=account_data["asset"],
-                balance=float(account_data["free"]) + float(account_data["locked"]),
-                frozen=float(account_data["locked"]),
-                gateway_name=self.gateway_name
-            )
+        if data.get('code') == 0:
+            for balance in data["data"]:
+                account: AccountData = AccountData(
+                    accountid=balance['coin'],
+                    balance=float(balance['balance']),
+                    frozen=float(balance['freeze']),
+                    gateway_name=self.gateway_name
+                )
 
-            if account.balance:
-                self.gateway.on_account(account)
+                if account.balance:
+                    self.gateway.on_account(account)
 
-        self.gateway.write_log("账户资金查询成功")
+            self.gateway.write_log("账户资金查询成功")
 
     def on_query_order(self, data: dict, request: Request) -> None:
         """未成交委托查询回报"""
