@@ -303,7 +303,8 @@ class XEXSpotRestAPi(RestClient):
             return self.order_count
 
     def send_order(self, req: OrderRequest) -> str:
-        """委托下单"""
+        """委托下单 阻塞等单号 todo 等有websocket API再开发"""
+
         # 生成本地委托号
         orderid: str = str(self.connect_time + self._new_order_id())
 
@@ -320,24 +321,16 @@ class XEXSpotRestAPi(RestClient):
 
         # 生成委托请求
         params: dict = {
-            "symbol": req.symbol.upper(),
-            "side": DIRECTION_VT2XEX[req.direction],
-            "type": ORDERTYPE_VT2XEX[req.type],
-            "quantity": format(req.volume, "f"),
-            "newClientOrderId": orderid,
-            "newOrderRespType": "ACK"
+            "symbol": req.symbol,
+            "price": req.price,
+            "amount": format(req.volume, ".5f"),
+            "direction": DIRECTION_VT2XEX[req.direction],
+            "orderType": ORDERTYPE_VT2XEX[req.type],
         }
-
-        if req.type == OrderType.LIMIT:
-            params["timeInForce"] = "GTC"
-            params["price"] = str(req.price)
-        elif req.type == OrderType.STOP:
-            params["type"] = "STOP_MARKET"
-            params["stopPrice"] = float(req.price)
 
         self.add_request(
             method="POST",
-            path="/api/v3/order",
+            path="v1/trade/order/create",
             callback=self.on_send_order,
             data=data,
             params=params,
@@ -346,7 +339,7 @@ class XEXSpotRestAPi(RestClient):
             on_failed=self.on_send_order_failed
         )
 
-        return order.vt_orderid
+        return "0000"
 
     def cancel_order(self, req: CancelRequest) -> None:
         """委托撤单"""
@@ -424,10 +417,11 @@ class XEXSpotRestAPi(RestClient):
 
     def on_send_order(self, data: dict, request: Request) -> None:
         """委托下单回报"""
-        pass
+        self.query_order()
 
     def on_send_order_failed(self, status_code: str, request: Request) -> None:
         """委托下单失败服务器报错回报"""
+        # todo 无extra
         order: OrderData = request.extra
         order.status = Status.REJECTED
         self.gateway.on_order(order)
@@ -439,6 +433,7 @@ class XEXSpotRestAPi(RestClient):
             self, exception_type: type, exception_value: Exception, tb, request: Request
     ) -> None:
         """委托下单回报函数报错回报"""
+        # todo 无extra
         order: OrderData = request.extra
         order.status = Status.REJECTED
         self.gateway.on_order(order)
