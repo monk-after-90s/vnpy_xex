@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 from enum import Enum
 from threading import Lock
 
-import beeprint
 import pytz
 from typing import Any, Dict, List
 
@@ -41,7 +40,7 @@ CHINA_TZ = pytz.timezone("Asia/Shanghai")
 BASE_URL: str = "http://openapi.hipiex.net/spot/"
 
 # 委托状态映射
-STATUS_BINANCE2VT: Dict[str, Status] = {
+STATUS_XEX2VT: Dict[str, Status] = {
     "NEW": Status.NOTTRADED,
     "PARTIALLY_FILLED": Status.PARTTRADED,
     "PARTIALLY_CANCELED": Status.NOTTRADED,
@@ -52,21 +51,21 @@ STATUS_BINANCE2VT: Dict[str, Status] = {
 }
 
 # 委托类型映射
-ORDERTYPE_VT2BINANCE: Dict[OrderType, str] = {
+ORDERTYPE_VT2XEX: Dict[OrderType, str] = {
     OrderType.LIMIT: "LIMIT",
     OrderType.MARKET: "MARKET"
 }
-ORDERTYPE_BINANCE2VT: Dict[str, OrderType] = {v: k for k, v in ORDERTYPE_VT2BINANCE.items()}
+ORDERTYPE_XEX2VT: Dict[str, OrderType] = {v: k for k, v in ORDERTYPE_VT2XEX.items()}
 
 # 买卖方向映射
-DIRECTION_VT2BINANCE: Dict[Direction, str] = {
+DIRECTION_VT2XEX: Dict[Direction, str] = {
     Direction.LONG: "BUY",
     Direction.SHORT: "SELL"
 }
-DIRECTION_BINANCE2VT: Dict[str, Direction] = {v: k for k, v in DIRECTION_VT2BINANCE.items()}
+DIRECTION_XEX2VT: Dict[str, Direction] = {v: k for k, v in DIRECTION_VT2XEX.items()}
 
 # 数据频率映射
-INTERVAL_VT2BINANCE: Dict[Interval, str] = {
+INTERVAL_VT2XEX: Dict[Interval, str] = {
     Interval.MINUTE: "1m",
     Interval.HOUR: "1h",
     Interval.DAILY: "1d",
@@ -252,7 +251,7 @@ class XEXSpotRestAPi(RestClient):
         """未成交委托查询回报"""
         if data['code'] == 0:
             for d in data['data']:
-                if d['orderType'] not in ORDERTYPE_BINANCE2VT.keys():
+                if d['orderType'] not in ORDERTYPE_XEX2VT.keys():
                     continue
                 order: OrderData = OrderData(
                     orderid=d['orderId'],
@@ -260,10 +259,10 @@ class XEXSpotRestAPi(RestClient):
                     exchange=Exchange.XEX,
                     price=float(d["price"]),
                     volume=float(d['origQty']),
-                    type=ORDERTYPE_BINANCE2VT[d['orderType']],
-                    direction=DIRECTION_BINANCE2VT[d['orderSide']],
+                    type=ORDERTYPE_XEX2VT[d['orderType']],
+                    direction=DIRECTION_XEX2VT[d['orderSide']],
                     traded=float(d['executedQty']),
-                    status=STATUS_BINANCE2VT.get(d['state'], None),
+                    status=STATUS_XEX2VT.get(d['state'], None),
                     datetime=generate_datetime(d['createdTime']),
                     gateway_name=self.gateway_name,
                 )
@@ -322,8 +321,8 @@ class XEXSpotRestAPi(RestClient):
         # 生成委托请求
         params: dict = {
             "symbol": req.symbol.upper(),
-            "side": DIRECTION_VT2BINANCE[req.direction],
-            "type": ORDERTYPE_VT2BINANCE[req.type],
+            "side": DIRECTION_VT2XEX[req.direction],
+            "type": ORDERTYPE_VT2XEX[req.type],
             "quantity": format(req.volume, "f"),
             "newClientOrderId": orderid,
             "newOrderRespType": "ACK"
