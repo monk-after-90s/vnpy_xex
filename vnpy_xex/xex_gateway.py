@@ -5,6 +5,8 @@ from copy import copy
 from datetime import datetime, timedelta
 from enum import Enum
 from threading import Lock
+
+import beeprint
 import pytz
 from typing import Any, Dict, List
 
@@ -42,6 +44,7 @@ BASE_URL: str = "http://openapi.hipiex.net/spot/"
 STATUS_BINANCE2VT: Dict[str, Status] = {
     "NEW": Status.NOTTRADED,
     "PARTIALLY_FILLED": Status.PARTTRADED,
+    "PARTIALLY_CANCELED": Status.NOTTRADED,
     "FILLED": Status.ALLTRADED,
     "CANCELED": Status.CANCELLED,
     "REJECTED": Status.REJECTED,
@@ -226,7 +229,46 @@ class XEXSpotRestAPi(RestClient):
         self.query_time()
         self.query_account()
         self.query_contract()
-        # self.start_user_stream()
+
+    def query_order(self) -> None:
+        """查询未成交委托"""
+        for symbol in symbol_contract_map.keys():
+            self.add_request(
+                method="GET",
+                path="v1/trade/order/listUnfinished",
+                params={"symbol": symbol, "direction": "BUY"},
+                callback=self.on_query_order,
+                data={"security": Security.SIGNED}
+            )
+            self.add_request(
+                method="GET",
+                path="v1/trade/order/listUnfinished",
+                params={"symbol": symbol, "direction": "SELL"},
+                callback=self.on_query_order,
+                data={"security": Security.SIGNED}
+            )
+
+    def on_query_order(self, data: dict, request: Request) -> None:
+        """未成交委托查询回报"""
+        if data['code'] == 0:
+            for d in data['data']:
+                if d['orderType'] not in ORDERTYPE_BINANCE2VT.keys():
+                    continue
+                order: OrderData = OrderData(
+                    orderid=d['orderId'],
+                    symbol=d['symbol'],
+                    exchange=Exchange.XEX,
+                    price=float(d["price"]),
+                    volume=float(d['origQty']),
+                    type=ORDERTYPE_BINANCE2VT[d['orderType']],
+                    direction=DIRECTION_BINANCE2VT[d['orderSide']],
+                    traded=float(d['executedQty']),
+                    status=STATUS_BINANCE2VT.get(d['state'], None),
+                    datetime=generate_datetime(d['createdTime']),
+                    gateway_name=self.gateway_name,
+                )
+                self.gateway.on_order(order)
+            self.gateway.write_log("委托信息查询成功")
 
     def query_time(self) -> None:
         """查询时间"""
@@ -379,6 +421,7 @@ class XEXSpotRestAPi(RestClient):
                     symbol_contract_map[contract.symbol] = contract
 
             self.gateway.write_log("合约信息查询成功")
+            self.query_order()
 
     def on_send_order(self, data: dict, request: Request) -> None:
         """委托下单回报"""
