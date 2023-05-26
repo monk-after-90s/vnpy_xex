@@ -42,7 +42,7 @@ if __name__ == '__main__':
     secret = "d489f7d00692e0077aa62a09c609f7daee6f84645fa96d245834817fedbef818"
     # apikey = "7f943fb10c73ea37c20b044448ebf9be0bfc4eeda1dc6dce85ec3c635824924b"
     # secret = "34d5ab4ccdae77203095417d927cf8196424bbba48480d2c6237aeb84681d934"
-    base_url = "http://openapi.hipiex.net/spot/"
+    base_url = "https://openapi.hipiex.net/spot/"
     # 获取用户资金
     path = "v1/u/wallet/list"
     params = {"coin": "USDT"}

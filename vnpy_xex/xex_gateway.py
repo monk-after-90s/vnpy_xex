@@ -37,7 +37,7 @@ CHINA_TZ = pytz.timezone("Asia/Shanghai")
 
 # 实盘REST API地址
 # BASE_URL: str = "http://54.254.54.220:8069/"
-BASE_URL: str = "http://openapi.hipiex.net/spot/"
+BASE_URL: str = "https://openapi.hipiex.net/spot/"
 
 # 委托状态映射
 STATUS_XEX2VT: Dict[str, Status] = {
