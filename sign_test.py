@@ -57,28 +57,33 @@ if __name__ == '__main__':
     beeprint.pp("wallet:")
     beeprint.pp(response.json())
     # 查询未完成订单
-    # path = "v1/trade/order/listUnfinished"
-    # params = {"symbol": "ETH_USDT", "direction": "BUY"}
-    # signature = simple_sign(params)
-    # headers = {
-    #     "x_access_key": apikey,
-    #     "x_signature": signature,
-    #     'Content-Type': 'application/json',
-    # }
-    # full_url = urljoin(base_url, path)
-    # response = requests.request("GET", full_url, headers=headers, params=params)
-    # beeprint.pp("listUnfinished:")
-    # beeprint.pp(response.json())
-    # 开单
-    path = 'v1/trade/order/create'
-    request_body = {"symbol": "LTC_USDT", "price": "101", "amount": "0.2", "direction": "BUY", "orderType": "LIMIT"}
-    signature = simple_sign(request_body)
+    path = "v1/trade/order/listUnfinished"
+    params = {"symbol": "LTC_USDT", "direction": "BUY"}
+    signature = simple_sign(params)
     headers = {
         "x_access_key": apikey,
         "x_signature": signature,
         'Content-Type': 'application/json',
     }
-    wallet_url = urljoin(base_url, path + "?" + urllib.parse.urlencode(sorted(request_body.items())))
-    response = requests.post(wallet_url, headers=headers)
-    beeprint.pp("order:")
+    full_url = urljoin(base_url, path)
+    response = requests.request("GET", full_url, headers=headers, params=params)
+    beeprint.pp("listUnfinished:")
     beeprint.pp(response.json())
+    # 开单
+    # path = 'v1/trade/order/create'
+    # request_body = {"symbol": "LTC_USDT",
+    #                 "price": "101",
+    #                 "amount": "0.2",
+    #                 "direction": "BUY",
+    #                 "orderType": "LIMIT",
+    #                 "clientOrderId": 123456}
+    # signature = simple_sign(request_body)
+    # headers = {
+    #     "x_access_key": apikey,
+    #     "x_signature": signature,
+    #     'Content-Type': 'application/json',
+    # }
+    # wallet_url = urljoin(base_url, path + "?" + urllib.parse.urlencode(sorted(request_body.items())))
+    # response = requests.post(wallet_url, headers=headers)
+    # beeprint.pp("order:")
+    # beeprint.pp(response.json())

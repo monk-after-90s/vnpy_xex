@@ -254,7 +254,7 @@ class XEXSpotRestAPi(RestClient):
                 if d['orderType'] not in ORDERTYPE_XEX2VT.keys():
                     continue
                 order: OrderData = OrderData(
-                    orderid=d['orderId'],
+                    orderid=d['clientOrderId'],
                     symbol=d['symbol'],
                     exchange=Exchange.XEX,
                     price=float(d["price"]),
@@ -320,24 +320,17 @@ class XEXSpotRestAPi(RestClient):
 
         # 生成委托请求
         params: dict = {
-            "symbol": req.symbol.upper(),
-            "side": DIRECTION_VT2XEX[req.direction],
-            "type": ORDERTYPE_VT2XEX[req.type],
-            "quantity": format(req.volume, "f"),
-            "newClientOrderId": orderid,
-            "newOrderRespType": "ACK"
+            "symbol": req.symbol,
+            "price": req.price,
+            "amount": format(req.volume, ".5f"),
+            "direction": DIRECTION_VT2XEX[req.direction],
+            "orderType": ORDERTYPE_VT2XEX[req.type],
+            "clientOrderId": orderid
         }
-
-        if req.type == OrderType.LIMIT:
-            params["timeInForce"] = "GTC"
-            params["price"] = str(req.price)
-        elif req.type == OrderType.STOP:
-            params["type"] = "STOP_MARKET"
-            params["stopPrice"] = float(req.price)
 
         self.add_request(
             method="POST",
-            path="/api/v3/order",
+            path="v1/trade/order/create",
             callback=self.on_send_order,
             data=data,
             params=params,
