@@ -532,6 +532,8 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
         """推送数据回报"""
         if packet == 'succeed':
             self.gateway.write_log("订阅账户成功")
+        elif packet["resType"] == "uBalance":
+            self.on_account(packet)
 
     def disconnect(self) -> None:
         """"主动断开webscoket链接"""
@@ -543,7 +545,23 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
 
     def on_account(self, packet: dict) -> None:
         """资金更新推送"""
-        ...
+        # {"resType": "uBalance",
+        #  "data": {
+        #    "coin": "usdt",
+        #     "freeze": "123", // 冻结
+        #     "balance": "123", // 余额
+        #     "availableBalance": "213"  // 可用
+        # }}
+        data = packet["data"]
+        account: AccountData = AccountData(
+            accountid=data["coin"],
+            balance=float(data["balance"]),
+            frozen=float(data["freeze"]),
+            gateway_name=self.gateway_name
+        )
+
+        if account.balance:
+            self.gateway.on_account(account)
 
     def on_order(self, packet: dict) -> None:
         """委托更新推送"""
