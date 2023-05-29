@@ -532,6 +532,10 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
         """推送数据回报"""
         if packet == 'succeed':
             self.gateway.write_log("订阅账户成功")
+        elif packet == 'invalid_ws_token':
+            self.gateway.write_log("ws token过期或者无效，重新请求获取ws token并发送给ws服务端")
+            # 发送ws token
+            self.gateway.rest_api.generate_ws_token(self.on_get_ws_token)
         elif packet["resType"] == "uBalance":
             self.on_account(packet)
 
