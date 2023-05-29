@@ -1,14 +1,16 @@
 import hashlib
 import hmac
+import json
+import time
 import urllib
+from asyncio import run_coroutine_threadsafe
 from copy import copy
 from datetime import datetime, timedelta
 from enum import Enum
 from threading import Lock
-
+from vnpy_websocket import WebsocketClient
 import pytz
 from typing import Any, Dict, List
-
 from requests.exceptions import SSLError
 from vnpy.trader.constant import (
     Direction,
@@ -39,6 +41,8 @@ CHINA_TZ = pytz.timezone("Asia/Shanghai")
 # BASE_URL: str = "http://54.254.54.220:8069/"
 BASE_URL: str = "https://openapi.hipiex.net/spot/"
 
+# 实盘Websocket API地址
+WEBSOCKET_TRADE_HOST: str = "wss://openapi.hipiex.net/websocket"
 # 委托状态映射
 STATUS_XEX2VT: Dict[str, Status] = {
     "NEW": Status.NOTTRADED,
@@ -108,6 +112,7 @@ class XEXSpotGateway(BaseGateway):
         """构造函数"""
         super().__init__(event_engine, gateway_name)
 
+        self.trade_ws_api: "XEXSpotTradeWebsocketApi" = XEXSpotTradeWebsocketApi(self)
         self.rest_api: "XEXSpotRestAPi" = XEXSpotRestAPi(self)
 
         self.orders: Dict[str, OrderData] = {}
@@ -169,6 +174,8 @@ class XEXSpotRestAPi(RestClient):
         self.gateway: XEXSpotGateway = gateway
         self.gateway_name: str = gateway.gateway_name
 
+        self.trade_ws_api: XEXSpotTradeWebsocketApi = self.gateway.trade_ws_api
+
         self.key: str = ""
         self.secret: bytes = b""
         self.proxy_host = ""
@@ -228,6 +235,7 @@ class XEXSpotRestAPi(RestClient):
         self.query_time()
         self.query_account()
         self.query_contract()
+        self.start_user_stream()
 
     def query_order(self) -> None:
         """查询未成交委托"""
@@ -365,9 +373,23 @@ class XEXSpotRestAPi(RestClient):
             extra=order
         )
 
-    def start_user_stream(self) -> Request:
-        """用户数据推送"""
-        ...
+    def start_user_stream(self):
+        """开启账户信息推送"""
+        self.trade_ws_api.connect(WEBSOCKET_TRADE_HOST, self.proxy_host, self.proxy_port)
+
+    def generate_ws_token(self, callback):
+        """生成ws-Token"""
+        data: dict = {
+            "security": Security.SIGNED
+        }
+
+        self.add_request(
+            method="GET",
+            path="v1/u/ws/token",
+            params={"time": int(time.time() * 1000)},
+            callback=callback,
+            data=data
+        )
 
     def on_query_account(self, data: dict, request: Request) -> None:
         """资金查询回报"""
@@ -465,6 +487,71 @@ class XEXSpotRestAPi(RestClient):
         # 当延长listenKey有效期时，忽略超时报错
         if not issubclass(exception_type, TimeoutError):
             self.on_error(exception_type, exception_value, tb, request)
+
+
+class XEXWebsocketClient(WebsocketClient):
+    def unpack_data(self, data: str):
+        """
+        对字符串数据进行json格式解包
+
+        如果需要使用json以外的解包格式，请重载实现本函数。
+        """
+        try:
+            return json.loads(data)
+        except json.JSONDecodeError:
+            return data
+
+
+class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
+    """XEX现货交易Websocket API"""
+
+    def __init__(self, gateway: XEXSpotGateway) -> None:
+        """构造函数"""
+        super().__init__()
+
+        self.gateway: XEXSpotGateway = gateway
+        self.gateway_name = gateway.gateway_name
+
+    def connect(self, url: str, proxy_host: str, proxy_port: int) -> None:
+        """连接Websocket交易频道"""
+        self.init(url, proxy_host, proxy_port)
+        self.start()
+
+    def on_connected(self) -> None:
+        """连接成功回报"""
+        self.gateway.write_log("交易Websocket API连接成功")
+        # 发送ws token
+        self.gateway.rest_api.generate_ws_token(self.on_get_ws_token)
+
+    def on_get_ws_token(self, data: dict, request: Request) -> None:
+        """获取ws-Token回报"""
+        ws_token = data['data']
+        self.send_packet({"sub": "subUser", "token": ws_token})
+
+    def on_packet(self, packet: Any) -> None:
+        """推送数据回报"""
+        if packet == 'succeed':
+            self.gateway.write_log("订阅账户成功")
+
+    def disconnect(self) -> None:
+        """"主动断开webscoket链接"""
+        self._active = False
+        ws = self._ws
+        if ws:
+            coro = ws.close()
+            run_coroutine_threadsafe(coro, self._loop)
+
+    def on_account(self, packet: dict) -> None:
+        """资金更新推送"""
+        ...
+
+    def on_order(self, packet: dict) -> None:
+        """委托更新推送"""
+
+    def on_disconnected(self) -> None:
+        """连接断开回报"""
+        self.gateway.write_log("交易Websocket API断开")
+        self.gateway.rest_api.start_user_stream()
 
 
 def generate_datetime(timestamp: float) -> datetime:
