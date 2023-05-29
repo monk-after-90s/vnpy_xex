@@ -267,7 +267,8 @@ class XEXSpotRestAPi(RestClient):
                     gateway_name=self.gateway_name,
                 )
                 self.gateway.on_order(order)
-            self.gateway.write_log("委托信息查询成功")
+            if data['data']:
+                self.gateway.write_log("委托信息查询成功")
 
     def query_time(self) -> None:
         """查询时间"""
