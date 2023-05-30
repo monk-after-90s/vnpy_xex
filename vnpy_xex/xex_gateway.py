@@ -140,9 +140,9 @@ class XEXSpotGateway(BaseGateway):
         """委托下单 批量下单"""
         return self.rest_api.send_order(*reqs)
 
-    def cancel_order(self, req: CancelRequest) -> None:
+    def cancel_order(self, *reqs: CancelRequest) -> None:
         """委托撤单"""
-        self.rest_api.cancel_order(req)
+        self.rest_api.cancel_order(*reqs)
 
     def query_account(self) -> None:
         """查询资金"""
@@ -381,17 +381,22 @@ class XEXSpotRestAPi(RestClient):
         else:
             return vt_orderids
 
-    def cancel_order(self, req: CancelRequest) -> None:
+    def cancel_order(self, *reqs: CancelRequest) -> None:
         """委托撤单"""
         data: dict = {
             "security": Security.SIGNED
         }
 
-        order: OrderData = self.gateway.get_order(req.orderid)
-        params: dict = {"list": json.dumps([{"isCreate": False,
-                                             "symbol": self.gateway.vn_symbol_to_exchange_symbol(req.symbol),
-                                             'clientOrderId': req.orderid}])}
-
+        cancel_params = []  # 撤单参数
+        params: dict = {"list": ""}
+        for req in reqs:
+            order: OrderData = self.gateway.get_order(req.orderid)
+            cancel_params.append(
+                {"isCreate": False,
+                 "symbol": self.gateway.vn_symbol_to_exchange_symbol(req.symbol),
+                 'clientOrderId': req.orderid}
+            )
+        params["list"] = json.dumps(cancel_params)
         self.add_request(
             method="POST",
             path="v1/trade/order/batchOrder",
