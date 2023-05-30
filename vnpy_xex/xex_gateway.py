@@ -179,6 +179,12 @@ class XEXSpotGateway(BaseGateway):
         """查询委托数据"""
         return self.orders.get(orderid, None)
 
+    @staticmethod
+    def vn_symbol_to_exchange_symbol(vn_symbol: str):
+        """vnpy的symbol转换为交易所的symbol"""
+        assert "." not in vn_symbol
+        return vn_symbol
+
 
 class XEXSpotRestAPi(RestClient):
     """币安现货REST API"""
@@ -374,16 +380,14 @@ class XEXSpotRestAPi(RestClient):
             "security": Security.SIGNED
         }
 
-        params: dict = {
-            "symbol": req.symbol.upper(),
-            "origClientOrderId": req.orderid
-        }
-
         order: OrderData = self.gateway.get_order(req.orderid)
+        params: dict = {"list": json.dumps([{"isCreate": False,
+                                             "symbol": self.gateway.vn_symbol_to_exchange_symbol(req.symbol),
+                                             'clientOrderId': req.orderid}])}
 
         self.add_request(
-            method="DELETE",
-            path="/api/v3/order",
+            method="POST",
+            path="v1/trade/order/batchOrder",
             callback=self.on_cancel_order,
             params=params,
             data=data,
