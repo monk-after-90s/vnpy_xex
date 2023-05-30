@@ -122,6 +122,8 @@ class XEXSpotGateway(BaseGateway):
         self.rest_api: "XEXSpotRestAPi" = XEXSpotRestAPi(self)
 
         self.orders: Dict[str, OrderData] = {}
+        # 订单号(XEX的orderId)到vntrade OrderData的映射
+        self.order_id_map: Dict[str, OrderData] = {}
 
     def connect(self, setting: dict):
         """连接交易接口"""
@@ -163,6 +165,13 @@ class XEXSpotGateway(BaseGateway):
     def on_order(self, order: OrderData) -> None:
         """推送委托数据"""
         self.orders[order.orderid] = copy(order)
+        origin_orderId = getattr(order, "origin_orderId", None)
+        if origin_orderId is not None:
+            self.order_id_map[origin_orderId] = order
+        if origin_orderId in self.order_id_map.keys() and (
+                order.status == Status.ALLTRADED or order.status == Status.REJECTED or order.status == Status.CANCELLED):
+            self.order_id_map.pop(origin_orderId)
+
         super().on_order(order)
 
     def get_order(self, orderid: str) -> OrderData:
@@ -280,6 +289,7 @@ class XEXSpotRestAPi(RestClient):
                     datetime=generate_datetime(d['createdTime']),
                     gateway_name=self.gateway_name,
                 )
+                setattr(order, "origin_orderId", d['orderId'])
                 self.gateway.on_order(order)
             if data['data']:
                 self.gateway.write_log("委托信息查询成功")
@@ -616,6 +626,7 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
             gateway_name=self.gateway_name,
             offset=offset
         )
+        setattr(order, "origin_orderId", data['orderId'])
 
         self.gateway.on_order(order)
 
