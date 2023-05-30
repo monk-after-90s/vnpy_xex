@@ -29,10 +29,11 @@ from vnpy.trader.object import (
     OrderRequest,
     CancelRequest,
     HistoryRequest,
-    SubscribeRequest
+    SubscribeRequest, TradeData
 )
 from vnpy.event import EventEngine
 from vnpy_rest import RestClient, Request
+from vnpy.trader.utility import round_to
 
 # 中国时区
 CHINA_TZ = pytz.timezone("Asia/Shanghai")
@@ -628,7 +629,32 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
         )
         setattr(order, "origin_orderId", data['orderId'])
 
+        order_last_snapshot = self.gateway.get_order(orderid)
+
         self.gateway.on_order(order)
+        # 计算trade
+        if order.traded > order_last_snapshot.traded:
+            trade_volume = order.traded - order_last_snapshot.traded
+            contract: ContractData = symbol_contract_map.get(order.symbol, None)
+            if contract:
+                trade_volume = round_to(trade_volume, contract.min_volume)
+
+            if not trade_volume:
+                return
+
+            trade: TradeData = TradeData(
+                symbol=order.symbol,
+                exchange=order.exchange,
+                orderid=order.orderid,
+                tradeid="-1",
+                direction=order.direction,
+                price=0,
+                volume=trade_volume,
+                datetime=generate_datetime(data["createTime"]),
+                gateway_name=self.gateway_name,
+                offset=offset
+            )
+            self.gateway.on_trade(trade)
 
     def on_disconnected(self) -> None:
         """连接断开回报"""
