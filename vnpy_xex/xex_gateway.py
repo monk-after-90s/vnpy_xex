@@ -53,13 +53,19 @@ STATUS_XEX2VT: Dict[str, Status] = {
     "REJECTED": Status.REJECTED,
     "EXPIRED": Status.CANCELLED
 }
-
+STATUS_INT_XEX2VT = {1: Status.NOTTRADED,
+                     2: Status.PARTTRADED,
+                     3: Status.ALLTRADED,
+                     4: Status.CANCELLED,
+                     5: Status.REJECTED,
+                     6: Status.CANCELLED}
 # 委托类型映射
 ORDERTYPE_VT2XEX: Dict[OrderType, str] = {
     OrderType.LIMIT: "LIMIT",
     OrderType.MARKET: "MARKET"
 }
 ORDERTYPE_XEX2VT: Dict[str, OrderType] = {v: k for k, v in ORDERTYPE_VT2XEX.items()}
+ORDERTYPE_INT_XEX2VT = {1: OrderType.LIMIT, 2: OrderType.MARKET}
 
 # 买卖方向映射
 DIRECTION_VT2XEX: Dict[Direction, str] = {
@@ -67,7 +73,7 @@ DIRECTION_VT2XEX: Dict[Direction, str] = {
     Direction.SHORT: "SELL"
 }
 DIRECTION_XEX2VT: Dict[str, Direction] = {v: k for k, v in DIRECTION_VT2XEX.items()}
-
+DIRECTION_INT_XEX2VT = {1: Direction.LONG, 2: Direction.SHORT}
 # 数据频率映射
 INTERVAL_VT2XEX: Dict[Interval, str] = {
     Interval.MINUTE: "1m",
@@ -538,6 +544,8 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
             self.gateway.rest_api.generate_ws_token(self.on_get_ws_token)
         elif packet["resType"] == "uBalance":
             self.on_account(packet)
+        elif packet["resType"] == "uOrder":
+            self.on_order(packet)
 
     def disconnect(self) -> None:
         """"主动断开webscoket链接"""
@@ -568,7 +576,48 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
             self.gateway.on_account(account)
 
     def on_order(self, packet: dict) -> None:
-        """委托更新推送"""
+        """委托更新推送
+
+        packet: {'data': {'avgPrice': '0',
+                          'clientOrderId': '1685411493',
+                          'createTime': 1685411494859,
+                          'dealQty': '0',
+                          'direction': 1,
+                          'orderId': '233662556898590912',
+                          'orderType': 1,
+                          'origQty': '0.2',
+                          'price': '1',
+                          'state': 4,
+                          'symbol': 'LTC_USDT'},
+                'resType': 'uOrder'}
+         """
+        data = packet['data']
+        # 过滤不支持类型的委托 1:LIMIT 2:MARKET
+        if data['orderType'] not in (1, 2):
+            return
+        # 自定义单号
+        orderid: str = data.get('clientOrderId')
+        if orderid is None:
+            return
+
+        offset = self.gateway.get_order(orderid).offset if self.gateway.get_order(orderid) else None
+        # vn order
+        order: OrderData = OrderData(
+            symbol=data["symbol"],
+            exchange=Exchange.XEX,
+            orderid=orderid,
+            type=ORDERTYPE_INT_XEX2VT[data["orderType"]],
+            direction=DIRECTION_INT_XEX2VT[data["direction"]],
+            price=float(data["price"]),
+            volume=float(data["origQty"]),
+            traded=float(data["dealQty"]),
+            status=STATUS_INT_XEX2VT[data["state"]],
+            datetime=generate_datetime(data["createTime"]),
+            gateway_name=self.gateway_name,
+            offset=offset
+        )
+
+        self.gateway.on_order(order)
 
     def on_disconnected(self) -> None:
         """连接断开回报"""
