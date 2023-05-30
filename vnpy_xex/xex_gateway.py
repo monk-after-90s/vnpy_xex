@@ -162,6 +162,7 @@ class XEXSpotGateway(BaseGateway):
     def close(self) -> None:
         """关闭连接"""
         self.rest_api.stop()
+        self.trade_ws_api.stop()
 
     def on_order(self, order: OrderData) -> None:
         """推送委托数据"""
