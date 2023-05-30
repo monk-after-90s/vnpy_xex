@@ -136,9 +136,9 @@ class XEXSpotGateway(BaseGateway):
 
         self.rest_api.connect(key, secret, proxy_host, proxy_port)
 
-    def send_order(self, req: OrderRequest) -> str:
-        """委托下单"""
-        return self.rest_api.send_order(req)
+    def send_order(self, *reqs: OrderRequest) -> str:
+        """委托下单 批量下单"""
+        return self.rest_api.send_order(*reqs)
 
     def cancel_order(self, req: CancelRequest) -> None:
         """委托撤单"""
@@ -337,44 +337,49 @@ class XEXSpotRestAPi(RestClient):
             self.order_count += 1
             return self.order_count
 
-    def send_order(self, req: OrderRequest) -> str:
-        """委托下单"""
-        # 生成本地委托号
-        orderid: str = str(self.connect_time + self._new_order_id())
+    def send_order(self, *reqs: OrderRequest) -> str:
+        """委托下单 批量下单"""
+        vt_orderids = []  # 单号
+        order_params = []  # 下单参数
+        for req in reqs:
+            # 生成本地委托号
+            orderid: str = str(self.connect_time + self._new_order_id())
 
-        # 推送提交中事件
-        order: OrderData = req.create_order_data(
-            orderid,
-            self.gateway_name
-        )
-        self.gateway.on_order(order)
-
+            # 推送提交中事件
+            order: OrderData = req.create_order_data(
+                orderid,
+                self.gateway_name
+            )
+            self.gateway.on_order(order)
+            order_params.append({"isCreate": True,
+                                 "symbol": req.symbol,
+                                 "price": req.price,
+                                 "totalAmount": format(req.volume, ".5f"),
+                                 "tradeType": ORDERTYPE_VT2XEX[req.type],
+                                 "direction": DIRECTION_VT2XEX[req.direction],
+                                 "clientOrderId": orderid})
+            vt_orderids.append(order.vt_orderid)
+        # 批量下单请求
         data: dict = {
             "security": Security.SIGNED
         }
-
-        # 生成委托请求
-        params: dict = {
-            "symbol": req.symbol,
-            "price": req.price,
-            "amount": format(req.volume, ".5f"),
-            "direction": DIRECTION_VT2XEX[req.direction],
-            "orderType": ORDERTYPE_VT2XEX[req.type],
-            "clientOrderId": orderid
-        }
+        params: dict = {"list": json.dumps(order_params)}
 
         self.add_request(
             method="POST",
-            path="v1/trade/order/create",
+            path="v1/trade/order/batchOrder",
             callback=self.on_send_order,
-            data=data,
             params=params,
-            extra=order,
+            data=data,
             on_error=self.on_send_order_error,
             on_failed=self.on_send_order_failed
         )
 
-        return order.vt_orderid
+        # 生成委托请求
+        if len(vt_orderids) == 1:
+            return vt_orderids[0]
+        else:
+            return vt_orderids
 
     def cancel_order(self, req: CancelRequest) -> None:
         """委托撤单"""
