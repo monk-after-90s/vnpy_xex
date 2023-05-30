@@ -87,3 +87,15 @@ if __name__ == '__main__':
     # response = requests.post(wallet_url, headers=headers)
     # beeprint.pp("order:")
     # beeprint.pp(response.json())
+    # 批量撤单
+    # path = "spot/v1/trade/order/batchOrder"
+    # params = {"list": '[{"isCreate": False, "symbol": "LTC_USDT", "clientOrderId": 123456}]'}
+    # headers = {
+    #     "x_access_key": apikey,
+    #     "x_signature": simple_sign(params),
+    #     'Content-Type': 'application/json',
+    # }
+    # wallet_url = urljoin(base_url, path + "?" + urllib.parse.urlencode(sorted(params.items())))
+    # response = requests.post(wallet_url, headers=headers, params=params, json=params)
+    # beeprint.pp("batchCancel:")
+    # beeprint.pp(response.json())
