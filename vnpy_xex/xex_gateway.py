@@ -209,19 +209,20 @@ class XEXSpotRestAPi(RestClient):
         """生成XEX签名"""
         security: Security = request.data["security"]
         request.data.pop("security")
-
         if security == Security.SIGNED:
             if request.params is None: request.params = {}
-            query = urllib.parse.urlencode(sorted(request.params.items()))
+            query = ''
+            for key, value in sorted(request.params.items()):
+                query += f"{key}={value}&"
+            query = query[:-1]
             signature = hmac.new(self.secret, query.encode(), hashlib.sha256).hexdigest()
-
             # 添加请求头
-            if request.headers is None: request.headers = {}
             headers = {
                 "x_access_key": self.key,
                 "x_signature": signature,
                 'Content-Type': 'application/json',
             }
+            if request.headers is None: request.headers = {}
             request.headers.update(headers)
         return request
 
