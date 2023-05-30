@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import json
@@ -535,10 +536,30 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
         self.gateway: XEXSpotGateway = gateway
         self.gateway_name = gateway.gateway_name
 
+        self.heart_beat_future: asyncio.Future = None
+
     def connect(self, url: str, proxy_host: str, proxy_port: int) -> None:
         """连接Websocket交易频道"""
         self.init(url, proxy_host, proxy_port)
         self.start()
+        # 心跳发送
+        if self.heart_beat_future: self.heart_beat_future.cancel()
+        self.heart_beat_future = run_coroutine_threadsafe(self.heart_beat(), self._loop)
+
+    async def heart_beat(self):
+        """40s发一次心跳"""
+        while self._active:
+            try:
+                if self._ws:
+                    asyncio.create_task(self._ws.send_str("ping"))
+                    self.gateway.write_log("ping")
+                    await asyncio.sleep(40)
+                else:
+                    await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                raise
+            except:
+                pass
 
     def on_connected(self) -> None:
         """连接成功回报"""
@@ -559,9 +580,11 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
             self.gateway.write_log("ws token过期或者无效，重新请求获取ws token并发送给ws服务端")
             # 发送ws token
             self.gateway.rest_api.generate_ws_token(self.on_get_ws_token)
-        elif packet["resType"] == "uBalance":
+        elif packet == "pong":
+            self.gateway.write_log("pong")
+        elif isinstance(packet, dict) and packet.get("resType") == "uBalance":
             self.on_account(packet)
-        elif packet["resType"] == "uOrder":
+        elif isinstance(packet, dict) and packet.get("resType") == "uOrder":
             self.on_order(packet)
 
     def disconnect(self) -> None:
@@ -571,6 +594,8 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
         if ws:
             coro = ws.close()
             run_coroutine_threadsafe(coro, self._loop)
+        if self.heart_beat_future:
+            self.heart_beat_future.cancel()
 
     def on_account(self, packet: dict) -> None:
         """资金更新推送"""
