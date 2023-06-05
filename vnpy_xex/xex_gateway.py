@@ -3,7 +3,6 @@ import hashlib
 import hmac
 import json
 import time
-import urllib
 from asyncio import run_coroutine_threadsafe
 from copy import copy
 from datetime import datetime, timedelta
@@ -350,6 +349,7 @@ class XEXSpotRestAPi(RestClient):
                 orderid,
                 self.gateway_name
             )
+            order.datetime = datetime.now(CHINA_TZ)
             self.gateway.on_order(order)
             order_params.append({"isCreate": True,
                                  "symbol": req.symbol,
