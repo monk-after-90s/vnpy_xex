@@ -8,6 +8,8 @@ from copy import copy
 from datetime import datetime, timedelta
 from enum import Enum
 from threading import Lock
+import beeprint
+from loguru import logger
 from vnpy_websocket import WebsocketClient
 import pytz
 from typing import Any, Dict, List
@@ -474,10 +476,14 @@ class XEXSpotRestAPi(RestClient):
 
     def on_send_order(self, data: dict, request: Request) -> None:
         """委托下单回报"""
-        pass
+        logger.debug(
+            f"on_send_order data={beeprint.pp(data, output=False, sort_keys=False)} {request.path=} request.params={beeprint.pp(request.params, output=False, sort_keys=False)}")
 
     def on_send_order_failed(self, status_code: str, request: Request) -> None:
         """委托下单失败服务器报错回报"""
+        logger.debug(
+            f"on_send_order_failed {status_code=} {request.path=} request.params={beeprint.pp(request.params, output=False, sort_keys=False)}")
+
         order: OrderData = request.extra
         order.status = Status.REJECTED
         self.gateway.on_order(order)
@@ -489,6 +495,9 @@ class XEXSpotRestAPi(RestClient):
             self, exception_type: type, exception_value: Exception, tb, request: Request
     ) -> None:
         """委托下单回报函数报错回报"""
+        logger.debug(
+            f"on_send_order_error {exception_type=} {exception_value=} {tb=} {request.path=} request.params={beeprint.pp(request.params, output=False, sort_keys=False)}")
+
         order: OrderData = request.extra
         order.status = Status.REJECTED
         self.gateway.on_order(order)
