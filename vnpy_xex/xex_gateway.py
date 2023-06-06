@@ -683,7 +683,7 @@ class XEXSpotTradeWebsocketApi(XEXWebsocketClient):
 
         self.gateway.on_order(order)
         # 计算trade
-        if order.traded > order_last_snapshot.traded:
+        if order_last_snapshot is not None and order.traded > order_last_snapshot.traded:
             trade_volume = order.traded - order_last_snapshot.traded
             contract: ContractData = symbol_contract_map.get(order.symbol, None)
             if contract:
