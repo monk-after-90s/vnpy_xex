@@ -355,8 +355,8 @@ class XEXSpotRestAPi(RestClient):
             self.gateway.on_order(order)
             order_params.append({"isCreate": True,
                                  "symbol": req.symbol,
-                                 "price": req.price,
-                                 "totalAmount": format(req.volume, ".5f"),
+                                 "price": round_to(req.price, symbol_contract_map[req.symbol].pricetick),
+                                 "totalAmount": round_to(req.volume, symbol_contract_map[req.symbol].min_volume),
                                  "tradeType": ORDERTYPE_VT2XEX[req.type],
                                  "direction": DIRECTION_VT2XEX[req.direction],
                                  "clientOrderId": orderid})
