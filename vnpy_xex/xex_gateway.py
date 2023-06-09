@@ -343,6 +343,8 @@ class XEXSpotRestAPi(RestClient):
         vt_orderids = []  # 单号
         order_params = []  # 下单参数
         for req in reqs:
+            req.price = round_to(req.price, symbol_contract_map[req.symbol].pricetick)
+            req.volume = round_to(req.volume, symbol_contract_map[req.symbol].min_volume)
             # 生成本地委托号
             orderid: str = str(self.connect_time + self._new_order_id())
 
@@ -355,8 +357,8 @@ class XEXSpotRestAPi(RestClient):
             self.gateway.on_order(order)
             order_params.append({"isCreate": True,
                                  "symbol": req.symbol,
-                                 "price": round_to(req.price, symbol_contract_map[req.symbol].pricetick),
-                                 "totalAmount": round_to(req.volume, symbol_contract_map[req.symbol].min_volume),
+                                 "price": req.price,
+                                 "totalAmount": req.volume,
                                  "tradeType": ORDERTYPE_VT2XEX[req.type],
                                  "direction": DIRECTION_VT2XEX[req.direction],
                                  "clientOrderId": orderid})
