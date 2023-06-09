@@ -408,6 +408,7 @@ class XEXSpotRestAPi(RestClient):
             params=params,
             data=data,
             on_failed=self.on_cancel_failed,
+            on_error=self.on_cancel_error,
             extra=order
         )
 
@@ -524,6 +525,15 @@ class XEXSpotRestAPi(RestClient):
 
         msg = f"撤单失败，状态码：{status_code}，信息：{request.response.text}"
         self.gateway.write_log(msg)
+
+    def on_cancel_error(
+            self, exception_type: type, exception_value: Exception, tb, request: Request
+    ):
+        logger.debug(
+            f"on_cancel_error {exception_type=} {exception_value=} {tb=} {request.path=} request.params={beeprint.pp(request.params, output=False, sort_keys=False)}")
+
+        if not issubclass(exception_type, (ConnectionError, SSLError)):
+            self.on_error(exception_type, exception_value, tb, request)
 
     def on_keep_user_stream(self, data: dict, request: Request) -> None:
         """延长listenKey有效期回报"""
