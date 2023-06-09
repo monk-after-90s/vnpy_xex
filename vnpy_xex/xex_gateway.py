@@ -509,10 +509,14 @@ class XEXSpotRestAPi(RestClient):
 
     def on_cancel_order(self, data: dict, request: Request) -> None:
         """委托撤单回报"""
-        pass
+        logger.debug(
+            f"on_cancel_order data={beeprint.pp(data, output=False, sort_keys=False)} {request.path=} request.params={beeprint.pp(request.params, output=False, sort_keys=False)}")
 
     def on_cancel_failed(self, status_code: str, request: Request) -> None:
         """撤单回报函数报错回报"""
+        logger.debug(
+            f"on_cancel_failed {status_code=} {request.path=} request.params={beeprint.pp(request.params, output=False, sort_keys=False)}")
+
         if request.extra:
             order = request.extra
             order.status = Status.REJECTED
