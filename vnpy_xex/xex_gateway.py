@@ -516,11 +516,6 @@ class XEXSpotRestAPi(RestClient):
         logger.debug(
             f"on_cancel_failed {status_code=} {request.path=} request.params={beeprint.pp(request.params, output=False, sort_keys=False)}")
 
-        if request.extra:
-            order = request.extra
-            order.status = Status.REJECTED
-            self.gateway.on_order(order)
-
         msg = f"撤单失败，状态码：{status_code}，信息：{request.response.text}"
         self.gateway.write_log(msg)
 
