@@ -509,12 +509,7 @@ class XEXSpotRestAPi(RestClient):
 
     def on_cancel_order(self, data: dict, request: Request) -> None:
         """委托撤单回报"""
-        order_params = json.loads(request.params["list"])
-        for order_param in order_params:
-            orderid = order_param["clientOrderId"]
-            order: OrderData = self.gateway.get_order(orderid)
-            order.status = Status.CANCELLED
-            self.gateway.on_order(order)
+        pass
 
     def on_cancel_failed(self, status_code: str, request: Request) -> None:
         """撤单回报函数报错回报"""
