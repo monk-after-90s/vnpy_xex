@@ -475,7 +475,7 @@ class XEXSpotRestAPi(RestClient):
                     symbol_contract_map[contract.symbol] = contract
 
             self.gateway.write_log("合约信息查询成功")
-            self.query_order()
+            # self.query_order()
 
     def on_send_order(self, data: dict, request: Request) -> None:
         """委托下单回报"""
