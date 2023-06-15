@@ -521,10 +521,10 @@ class XEXSpotRestAPi(RestClient):
         self.gateway.write_log(msg)
 
     def on_cancel_error(
-            self, exception_type: type, exception_value: Exception, tb, request: Request
+            self, exception_type: type, exception_value: Exception, tb: TracebackType, request: Request
     ):
         logger.debug(
-            f"on_cancel_error {exception_type=} {exception_value=} {tb=} {request.path=} request.params={beeprint.pp(request.params, output=False, sort_keys=False)}")
+            f"on_cancel_error {exception_type=} {exception_value=} {tb.tb_next=} {request.path=} request.params={beeprint.pp(request.params, output=False, sort_keys=False)}")
 
         if not issubclass(exception_type, (ConnectionError, SSLError)):
             self.on_error(exception_type, exception_value, tb, request)
