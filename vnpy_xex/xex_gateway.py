@@ -8,6 +8,8 @@ from copy import copy
 from datetime import datetime, timedelta
 from enum import Enum
 from threading import Lock
+from types import TracebackType
+
 import beeprint
 from loguru import logger
 from vnpy_websocket import WebsocketClient
